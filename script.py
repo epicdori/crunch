@@ -6,16 +6,20 @@ from graphviz import Digraph
 
 parser = ArgumentParser()
 parser.add_argument(dest='org', help='organization to fetch aquisitions for')
+parser.add_argument('--mobile', dest='mobile', help='list mobile applications')
 args = parser.parse_args()
-output_file = "/root/" + args.org + ".out"
-output = open(output_file,"w+")
+output_file = "/root/" + args.org + ".toplevels.out"
+top_level_domains = open(output_file,"w+")
+output_file2 = "/root/" + args.org + ".mobileapps.out"
+mobile_apps = open(output_file2,"w+")
 file = "/root/corp.json" 
 
 def get_acq(org):
 	try:	
 		headers = {'Accept':'application/json, text/plain, */*',
 		'X-Requested-With':'XMLHttpRequest',
-		'X-Distil-Ajax':'vztwxdbs',
+		#distill networks protections removed from crunch, placeholder in case it comes back
+		#'X-Distil-Ajax':'vztwxdbs',
 		'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36',
 		'Referer':'https://www.crunchbase.com/organization/walmart',
 		'Accept-Encoding':'gzip, deflate',
@@ -23,11 +27,10 @@ def get_acq(org):
 		url = "https://www.crunchbase.com/v4/data/entities/organizations/"+org+"?field_ids=%5B%22identifier%22,%22layout_id%22,%22facet_ids%22,%22title%22,%22short_description%22,%22is_locked%22%5D&layout_mode=view"
 		r = requests.get(url, headers=headers)
 		#throttle to not trigger distill networks protection 		
-		time.sleep(3)
-		print(r.text)
+		time.sleep(2)
 		return r.json()
 	except:
-		print("Not receiving valid json data, check X-Distil-Ajax Header")
+		print("Not receiving valid json data")
 
 def load_acq(file):
 	json_data=open(file).read()
@@ -54,20 +57,28 @@ def create_nodes(org, data):
 def process_org(org, uuid):
 	#make request	
 	data = get_acq(uuid)
+
 	#validate a response is correct
 	try:
 		test = data['cards']['acquisitions_list']
 	except:
-		print("Something is wrong either you need to update the key or " + org + "has no records")
+		print("Data is not accessible or " + org + "has no records")
 		return
-	#keep working for companies with no site
+	
+	#add primary top level domain to graph and text output
 	try:	
 		site = data['cards']['overview_fields2']['website']['value']
-		print('site: ' + site)
-		output.write(site + '\n')
+		top_level_domains.write(site + '\n')
 		dot.node(org, org + "\\n" + site)
 	except:
 		dot.node(org, org)
+		
+	#print mobile apps to file
+	for idx,app in enumerate(data['cards']['apptopia_app_overview_list']):		
+			app = app['identifier']['value']
+			store = app['stores']
+		 	mobile_apps.write(org + " " + app + " " + store)
+	
 	for idx,company in enumerate(data['cards']['acquisitions_list']):
 		dot.node(company['acquiree_identifier']['value'], company['acquiree_identifier']['value'])
 		dot.edge(org, company['acquiree_identifier']['value'], label='aquisition')
@@ -93,7 +104,7 @@ def get_start_uuid(org):
 dot = Digraph(comment=args.org)
 uuid = get_start_uuid(args.org)
 process_org(args.org, uuid)
-dot.render('tmp/' + args.org + '_map.gv', view=True)
+dot.render('tmp/' + args.org + '_map.gv', view=False)
 
 
 
