@@ -8,14 +8,20 @@ parser = ArgumentParser()
 parser.add_argument(dest='org', help='organization to fetch aquisitions for')
 parser.add_argument('--mobile', dest='mobile', help='list mobile applications')
 args = parser.parse_args()
-output_file = "/root/" + args.org + ".toplevels.out"
+output_file = "/Users/dclar29/Desktop/" + args.org + ".toplevels.out"
 top_level_domains = open(output_file,"w+")
-output_file2 = "/root/" + args.org + ".mobileapps.out"
+output_file2 = "/Users/dclar29/Desktop/" + args.org + ".mobileapps.out"
 mobile_apps = open(output_file2,"w+")
-file = "/root/corp.json" 
+
+proxies = {
+	"http": "127.0.0.1:8085",
+	"https": "127.0.0.1:8085"
+}
+
+
 
 def get_acq(org):
-	try:	
+	try:
 		headers = {'Accept':'application/json, text/plain, */*',
 		'X-Requested-With':'XMLHttpRequest',
 		#distill networks protections removed from crunch, placeholder in case it comes back
@@ -25,8 +31,8 @@ def get_acq(org):
 		'Accept-Encoding':'gzip, deflate',
 		'Accept-Language':'en-US,en;q=0.9'}
 		url = "https://www.crunchbase.com/v4/data/entities/organizations/"+org+"?field_ids=%5B%22identifier%22,%22layout_id%22,%22facet_ids%22,%22title%22,%22short_description%22,%22is_locked%22%5D&layout_mode=view"
-		r = requests.get(url, headers=headers)
-		#throttle to not trigger distill networks protection 		
+		r = requests.get(url, headers=headers, proxies=proxies, verify=False)
+		#throttle to not trigger distill networks protection
 		time.sleep(2)
 		return r.json()
 	except:
@@ -55,7 +61,7 @@ def create_nodes(org, data):
 		dot.edge(org, company['ownee_identifier']['value'], label='subsidiary', fillcolor='green')		
 
 def process_org(org, uuid):
-	#make request	
+	#make request
 	data = get_acq(uuid)
 
 	#validate a response is correct
@@ -64,21 +70,19 @@ def process_org(org, uuid):
 	except:
 		print("Data is not accessible or " + org + "has no records")
 		return
-	
-	#add primary top level domain to graph and text output
-	try:	
+
+	#add primary top level domain to graph and text output if it exists in dataset otherwise skip
+	try:
 		site = data['cards']['overview_fields2']['website']['value']
 		top_level_domains.write(site + '\n')
 		dot.node(org, org + "\\n" + site)
 	except:
 		dot.node(org, org)
-		
-	#print mobile apps to file
-	for idx,app in enumerate(data['cards']['apptopia_app_overview_list']):		
-			app = app['identifier']['value']
-			store = app['stores']
-		 	mobile_apps.write(org + " " + app + " " + store)
-	
+		pass
+
+	for idx,app in enumerate(data['cards']['apptopia_app_overview_list_public']):		
+		app = app['identifier']['value']
+		mobile_apps.write(org + " " + app + "\n")
 	for idx,company in enumerate(data['cards']['acquisitions_list']):
 		dot.node(company['acquiree_identifier']['value'], company['acquiree_identifier']['value'])
 		dot.edge(org, company['acquiree_identifier']['value'], label='aquisition')
@@ -86,20 +90,20 @@ def process_org(org, uuid):
 		dot.node(company['ownee_identifier']['value'], company['ownee_identifier']['value'])
 		dot.edge(org, company['ownee_identifier']['value'], label='subsidiary')
 	if(len(data['cards']['acquisitions_list']) > 0 or len(data['cards']['sub_organizations_image_list']) > 0):
-		for company in data['cards']['acquisitions_list']:			
+		for company in data['cards']['acquisitions_list']:
 			uuid = company['acquiree_identifier']['uuid']
 			name = company['acquiree_identifier']['value']		
 			process_org(name, uuid)
 		for company in data['cards']['sub_organizations_image_list']:
 			uuid = company['ownee_identifier']['uuid']
-			name = company['ownee_identifier']['value']			
+			name = company['ownee_identifier']['value']
 			process_org(name, uuid)			
 
 #initial request to get uuid
 def get_start_uuid(org):
-	data = get_acq(org)
-	uuid = data['properties']['identifier']['uuid']
-	return uuid
+		data = get_acq(org)
+		uuid = data['properties']['identifier']['uuid']
+		return uuid
 	
 dot = Digraph(comment=args.org)
 uuid = get_start_uuid(args.org)
