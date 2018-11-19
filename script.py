@@ -8,9 +8,9 @@ parser = ArgumentParser()
 parser.add_argument(dest='org', help='organization to fetch aquisitions for')
 parser.add_argument('--mobile', dest='mobile', help='list mobile applications')
 args = parser.parse_args()
-output_file = "/Users/dclar29/Desktop/" + args.org + ".toplevels.out"
+output_file = "/Users/me/Desktop/" + args.org + ".toplevels.out"
 top_level_domains = open(output_file,"w+")
-output_file2 = "/Users/dclar29/Desktop/" + args.org + ".mobileapps.out"
+output_file2 = "/Users/me/Desktop/" + args.org + ".mobileapps.out"
 mobile_apps = open(output_file2,"w+")
 
 proxies = {
